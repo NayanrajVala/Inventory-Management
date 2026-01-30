@@ -2,6 +2,7 @@ import { Injectable, NotFoundException } from '@nestjs/common';
 import { CreateProductDto, UpdateProductDto } from './dtos/products.dto';
 import { PrismaService } from 'src/prisma.service';
 import { Prisma, Product } from '@prisma/client';
+import { ProductNotFoundException } from 'src/common/exceptions/productNotFound.exception';
 
 @Injectable()
 export class ProductsService {
@@ -11,37 +12,36 @@ export class ProductsService {
     return await this.prisma.product.findMany();
   }
 
-  async find(quantity:number):Promise<Product | null>{
-    return await this.prisma.product.findFirst({where:{quantity}})
+  async find(quantity: number): Promise<Product | null> {
+    return await this.prisma.product.findFirst({ where: { quantity } });
   }
 
-  async create(dto: CreateProductDto) {
+  async create(dto: CreateProductDto,user:{id:string , roles:string[]}) {
     try {
       return await this.prisma.product.create({
         data: {
           name: dto.name,
           price: dto.price,
           quantity: dto.quantity,
+          userId:user.id,
         },
       });
     } catch (error) {
-      throw error ; 
+      throw error;
       // console.log(error, 'errorss');
     }
   }
 
-  async updateProduct(id: string, dto: UpdateProductDto) {
+  async updateProduct(id: string, dto: UpdateProductDto,user:{id:string, roles:string[]}) {
+    console.log('Service Hit');
     const Product = await this.prisma.product.findUnique({ where: { id } });
     if (!Product) {
-      throw new NotFoundException({
-        message: 'Product Not Founded',
-      });
+      throw new ProductNotFoundException();
+      // message: 'Product Not Founded',
     }
     return await this.prisma.product.update({
       where: { id },
-      data: {
-        quantity: dto.quantity,
-      },
+      data: dto,
     });
   }
 

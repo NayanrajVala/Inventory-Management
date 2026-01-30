@@ -13,9 +13,22 @@ datasource db {
   provider = "postgresql"
 }
 
+model User{
+  id String @id @default(uuid())
+  email String @unique
+  password String 
+  roles String[] 
+
+  products Product[]
+}
+
 model Product{
   id String @id @default(uuid())
   name String 
   price Int 
   quantity Int
+
+  userId String 
+  user User @relation(fields:[userId] , references:[id])
 }
+
