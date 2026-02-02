@@ -23,13 +23,13 @@ export class jwtAuthGuard implements CanActivate {
 
     const header = request.headers.authorization;
 
-    console.log(header);
+    // console.log(header);
     if (!header) {
       throw new UnauthorizedException('Authorization header missing');
     }
     const [type, token] = header.split(' ');
-    console.log('type', type, token);
-    if (!token && !(type == 'Bearer')) {
+    // console.log('type', type, token);
+    if (!token || !(type == 'Bearer')) {
       throw new UnauthorizedException('Token is missing or expired');
     }
     try {

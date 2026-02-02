@@ -16,14 +16,14 @@ export class ProductsService {
     return await this.prisma.product.findFirst({ where: { quantity } });
   }
 
-  async create(dto: CreateProductDto,user:{id:string , roles:string[]}) {
+  async create(dto: CreateProductDto,user:{userId:string , roles:string[]}) {
     try {
       return await this.prisma.product.create({
         data: {
           name: dto.name,
           price: dto.price,
           quantity: dto.quantity,
-          userId:user.id,
+          userId:user.userId,
         },
       });
     } catch (error) {

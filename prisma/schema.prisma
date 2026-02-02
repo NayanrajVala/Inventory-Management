@@ -18,6 +18,7 @@ model User{
   email String @unique
   password String 
   roles String[] 
+  isVerified Boolean @default(false)
 
   products Product[]
 }
@@ -29,6 +30,5 @@ model Product{
   quantity Int
 
   userId String 
-  user User @relation(fields:[userId] , references:[id])
 }
 
