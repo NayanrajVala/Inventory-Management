@@ -11,6 +11,8 @@ import { RedisService } from 'src/redis/redis.service';
 import { MailService } from 'src/mail/mail.service';
 import { otpCheckDto } from 'src/products/dtos/verifyOtp.dto';
 import { Role } from 'src/common/enums/role.enum';
+import { PrismaService } from 'src/prisma.service';
+import { FastifyReply, FastifyRequest } from 'fastify';
 
 @Injectable()
 export class AuthService {
@@ -19,6 +21,7 @@ export class AuthService {
     private readonly jwtService: JwtService,
     private readonly redisService: RedisService,
     private readonly mailService: MailService,
+    private readonly prisma: PrismaService,
   ) {}
 
   async signup(dto: signupDto) {
@@ -74,7 +77,7 @@ export class AuthService {
     };
   }
 
-  async login(dto: signupDto) {
+  async login(dto: signupDto, reply: FastifyReply) {
     const { email, password } = dto;
     const user = await this.userService.findByEmail(email);
 
@@ -99,9 +102,23 @@ export class AuthService {
     };
 
     const accessToken = this.jwtService.sign(payload);
+    const refreshToken = this.jwtService.sign(payload, {
+      expiresIn: '7d',
+    });
 
-    console.log(accessToken);
-    console.log(user.roles);
+    const hash = await bcrypt.hash(refreshToken, 10);
+
+    await this.prisma.user.update({
+      where: { id: user.id },
+      data: { refreshTokenHash: hash },
+    });
+
+    reply.setCookie('refreshToken', refreshToken, {
+      httpOnly: true,
+      secure: true,
+      sameSite: 'strict',
+      path: '/',
+    });
     return {
       accessToken,
       user: {
@@ -111,4 +128,72 @@ export class AuthService {
       },
     };
   }
+
+  async refresh(req: FastifyRequest, reply: FastifyReply) {
+    const token = req.cookies.refreshToken;
+
+    if (!token) {
+      throw new UnauthorizedException();
+    }
+
+    const payload = this.jwtService.verify(token);
+
+    const user = await this.prisma.user.findUnique({
+      where: { id: payload.sub },
+    });
+
+    if (!user || !user.refreshTokenHash) {
+      throw new UnauthorizedException();
+    }
+
+    const valid = await bcrypt.compare(token, user.refreshTokenHash);
+    if (!valid) {
+      throw new UnauthorizedException();
+    }
+
+    const newAccessToken = this.jwtService.sign({
+      sub: user.id,
+      email: user.email,
+      roles: user.roles,
+    });
+
+    const newRefreshToken = this.jwtService.sign({
+      sub: user.id,
+      email: user.email,
+      roles: user.roles,
+    },{
+      expiresIn:'7d'
+    });
+
+    const hash = await bcrypt.hash(newRefreshToken,10);
+
+    await this.prisma.user.update({
+      where:{id:user.id},
+      data:{refreshTokenHash:hash}
+    });
+
+    reply.setCookie('refreshToken',newRefreshToken,{
+      httpOnly:true,
+      secure:true,
+      sameSite:"strict",
+      path:"/"
+    });
+
+    return{accessToken:newAccessToken};
+  }
+
+  async logout(userId: string, reply: FastifyReply) {
+    await this.prisma.user.update({
+      where: { id: userId },
+      data: { refreshTokenHash: null },
+    });
+
+    reply.clearCookie('refreshToken', {
+      path: '/',
+    });
+
+    return { message: 'Logged out successfully' };
+  }
+
+
 }

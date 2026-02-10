@@ -11,7 +11,7 @@ import { MailModule } from 'src/mail/mail.module';
 @Module({
   imports:[PrismaModule,UserModule,MailModule, JwtModule.register({
     secret:process.env.JWT_SECRET,
-    signOptions:{expiresIn:'45m'}
+    signOptions:{expiresIn:'15m'}
   })],
   controllers: [AuthController],
   providers: [AuthService,jwtAuthGuard],

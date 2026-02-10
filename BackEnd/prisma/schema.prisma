@@ -24,6 +24,7 @@ model User {
   password   String
   roles      Role[]
   isVerified Boolean @default(false)
+  refreshTokenHash String? 
 }
 
 model Product {

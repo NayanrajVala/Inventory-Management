@@ -15,24 +15,36 @@ export interface PaginatedProducts {
 export class ProductsService {
   constructor(private prisma: PrismaService) {}
   private products: CreateProductDto[] = [];
-  async findAll(page: number, limit: number,search:string , sortBy:string , order:'asc'|'desc'): Promise<PaginatedProducts> {
+  async findAll(
+    page: number,
+    limit: number,
+    search: string,
+    sortBy: string,
+    order: Prisma.SortOrder,
+  ): Promise<PaginatedProducts> {
     const skip = (page - 1) * limit;
 
-    const where:Prisma.ProductWhereInput = search?{
-      name:{
-        contains:search,
-        mode:'insensitive',
-      },
-    }:{};
+    const where: Prisma.ProductWhereInput = search
+      ? {
+          name: {
+            contains: search,
+            mode: 'insensitive',
+          },
+        }
+      : {};
     const [data, total] = await Promise.all([
       this.prisma.product.findMany({
         skip,
         take: limit,
         where,
-        orderBy:{
-          [sortBy]:order}
+        include: {
+          category: true,
+        },
+        orderBy: {
+          [sortBy]: order,
+        },
       }),
-      this.prisma.product.count({where}),
+      this.prisma.product.count({ where }),
     ]);
 
     return { data, total, page, lastPage: Math.ceil(total / limit) };

@@ -33,20 +33,16 @@ export class jwtAuthGuard implements CanActivate {
       throw new UnauthorizedException('Token is missing or expired');
     }
     try {
-      console.log('Token Hit');
-      console.log(token);
       const payload = this.jwtService.verify(token, {
         secret: process.env.JWT_SECRET,
       });
-      console.log('PayLoad Verified');
       request.user = {
         userId: payload.sub,
         roles: payload.roles,
         email: payload.email,
       };
-      console.log('Token Verified');
       return true;
-    } catch (err) {
+    } catch (err:any) {
       console.log('Catch Hit in Auth Guard: ', err.message);
       throw new UnauthorizedException('Invalid Token');
     }
