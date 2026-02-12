@@ -9,6 +9,10 @@ import { ValidationPipe } from '@nestjs/common';
 import { HttpExceptionFilter } from './common/exceptions/http_Exceptions.filter';
 import {SwaggerModule,DocumentBuilder} from '@nestjs/swagger';
 import cookie from "@fastify/cookie";
+// import multipart from '@fastify/multipart';
+
+const multipart = require('@fastify/multipart')
+
 async function bootstrap() {
   const app = await NestFactory.create<NestFastifyApplication>(
     AppModule,
@@ -20,6 +24,9 @@ async function bootstrap() {
     credentials:true
   });
   app.useGlobalFilters(new HttpExceptionFilter());
+
+  await app.register(multipart);
+
 
   app.useGlobalPipes(
     new ValidationPipe({

@@ -14,7 +14,6 @@ import {
 } from '@nestjs/common';
 import { ProductsService } from './products.service';
 import { CreateProductDto, UpdateProductDto } from './dtos/products.dto';
-// import { createProductPipe } from 'src/common/pipes/createProdcut.pipe';
 import { Roles } from 'src/common/decorators/roles.decorator';
 import { RolesGuard } from 'src/common/guards/roles.guard';
 import { jwtAuthGuard } from 'src/auth/auth.guard';
@@ -24,7 +23,6 @@ import {
   ApiOperation,
   ApiBearerAuth,
   ApiOkResponse,
-  ApiNoContentResponse,
   ApiCreatedResponse,
 } from '@nestjs/swagger';
 
@@ -55,16 +53,8 @@ export class ProductsController {
   ) {
     return this.productsService.findAll(page, limit,search,sortBy,order);
   }
-  @Get(':id')
-  @ApiOperation({ summary: 'Get Perticuler Prodcut' })
-  @ApiOkResponse({ description: 'Fetched Single Prodcut' })
-  @ApiNoContentResponse()
-  findByQuantity(@Query('quantity', ParseIntPipe) quantity: number) {
-    return this.productsService.find(quantity);
-  }
 
   @Patch(':id')
-  // @Roles(['admin'])
   @ApiOperation({ summary: 'Update a Product' })
   @ApiOkResponse({ description: 'Fetched All Prodcuts' })
   updateProduct(

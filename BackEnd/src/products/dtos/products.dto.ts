@@ -5,22 +5,22 @@ export class CreateProductDto {
   @IsString()
   @MinLength(1)
   @ApiProperty({example:"Bicycle"})
-  name: string;
+  name!: string;
   
   @IsInt()
   @Min(0)
   @ApiProperty({example:5000})
-  price: number;
+  price!: number;
 
   @IsInt()
   @Min(0)
   @ApiProperty({example:10})
-  quantity: number;
+  quantity!: number;
 
   @IsInt()
   @Min(1)
   @ApiProperty({example:2})
-  categoryId:number;
+  categoryId!:number;
 }
 
 export class UpdateProductDto extends PartialType(CreateProductDto){}
