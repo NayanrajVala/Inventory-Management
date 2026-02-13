@@ -9,6 +9,6 @@ export class UploadController {
     @Post('/file')
     async uploadFile(@Req() req:FastifyRequest ){
         // const parts = req.parts()
-        await this.uploadService.uploadFile(req);
+        return await this.uploadService.uploadFile(req);
     }
 }

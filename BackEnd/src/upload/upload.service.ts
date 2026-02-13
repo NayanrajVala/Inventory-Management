@@ -1,47 +1,59 @@
-import { BadRequestException,Injectable} from '@nestjs/common';
+import { BadRequestException, Injectable } from '@nestjs/common';
 import * as fs from 'fs';
- import fastify = require('fastify')
+import fastify = require('fastify');
 import path from 'path';
-
+import { S3Client, PutObjectCommand } from '@aws-sdk/client-s3';
 
 @Injectable()
 export class UploadService {
-     async uploadFile(req:fastify.FastifyRequest & any){
-        if(!req.isMultipart()){
-            throw new BadRequestException('request must be multipart')
-        }
+  private s3 = new S3Client({
+    region: process.env.AWS_REGION,
+    credentials: {
+      accessKeyId: process.env.AWS_ACCESS_KEY!,
+      secretAccessKey: process.env.AWS_SECRET_KEY!,
+    },
+  });
+  async uploadFile(req: fastify.FastifyRequest) {
+    if (!req.isMultipart()) {
+      throw new BadRequestException('request must be multipart');
+    }
 
-        const file = await req.file()
+    const file = await req.file();
 
-        if(!file){
-            throw new BadRequestException('No file uploaded')
-        }
+    if (!file) {
+      throw new BadRequestException('No file uploaded');
+    }
 
-        const allowedTypes = [
-            'application/vnd.ms.excel',
-            'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
-        ]
+    const allowedTypes = [
+      'application/vnd.ms-excel',
+      'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+      'text/csv',
+      'application/csv'
+    ];
 
-        if(!allowedTypes.includes(file.mimetype)){
-            throw new BadRequestException('Only excel files are accepted')
-        }
-        
-        const uploadDir = path.join(process.cwd(),'uploads')
+    if (!allowedTypes.includes(file.mimetype)) {
+      throw new BadRequestException('Only excel files are accepted');
+    }
 
-        if(!fs.existsSync(uploadDir)){
-            fs.mkdirSync(uploadDir)
-        }
+    const buffer = await file.toBuffer();
 
-        const buffer = await file.toBuffer()
+    const key = `excel/${Date.now()}-${file.filename}`;
 
-        const filepath = path.join(uploadDir,file.filename)
+    await this.s3.send(
+      new PutObjectCommand({
+        Bucket: process.env.AWS_BUCKET!,
+        Key: key,
+        Body: buffer,
+        ContentType: file.mimetype,
+      }),
+    );
 
-        fs.writeFileSync(filepath,buffer)
+    const url = `https://${process.env.AWS_BUCKET}.s3.${process.env.AWS_REGION}.amazonaws.com/${key}`;
 
-        return {
-            message:'File Uploaded successfully',
-            filename:file.filename,
-            path:filepath
-        }
-     }
-}   
+    return {
+      message: 'File Uploaded successfully',
+      filename: file.filename,
+      url,
+    };
+  }
+}

@@ -1,6 +1,6 @@
+import 'dotenv/config';
 import { NestFactory } from '@nestjs/core';
 import { AppModule } from './app.module';
-import 'dotenv/config';
 import {
   FastifyAdapter,
   NestFastifyApplication,
@@ -10,8 +10,9 @@ import { HttpExceptionFilter } from './common/exceptions/http_Exceptions.filter'
 import {SwaggerModule,DocumentBuilder} from '@nestjs/swagger';
 import cookie from "@fastify/cookie";
 // import multipart from '@fastify/multipart';
-
+import '@fastify/multipart';
 const multipart = require('@fastify/multipart')
+
 
 async function bootstrap() {
   const app = await NestFactory.create<NestFastifyApplication>(
