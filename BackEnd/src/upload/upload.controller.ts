@@ -1,4 +1,4 @@
-import { Controller, Req,Post, Res } from '@nestjs/common';
+import { Controller, Req,Post,Body } from '@nestjs/common';
 import { UploadService } from './upload.service';
 import type { FastifyReply, FastifyRequest } from 'fastify';
 
@@ -6,9 +6,21 @@ import type { FastifyReply, FastifyRequest } from 'fastify';
 export class UploadController {
     constructor(private readonly uploadService:UploadService){}
 
-    @Post('/file')
-    async uploadFile(@Req() req:FastifyRequest ){
-        // const parts = req.parts()
-        return await this.uploadService.uploadFile(req);
+    @Post('presigned-url')
+    getUploadUrl(
+        @Body()
+        body:{
+                filename:string,
+                mimetype:string
+        }
+    ){
+        return this.uploadService.getUploadUrl(
+            body.filename,
+            body.mimetype
+        )
+    }
+    @Post('/import')
+    async importFile(@Body() body:{key:string} ){
+        return await this.uploadService.uploadFile(body.key);
     }
 }
