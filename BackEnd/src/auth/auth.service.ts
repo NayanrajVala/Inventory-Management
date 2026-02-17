@@ -4,12 +4,12 @@ import {
   UnauthorizedException,
 } from '@nestjs/common';
 import { JwtModule, JwtService } from '@nestjs/jwt';
-import { signupDto } from 'src/products/dtos/signup.dto';
+import { signupDto } from 'src/auth/dtos/signup.dto';
 import { UserService } from 'src/user/user.service';
 import * as bcrypt from 'bcrypt';
 import { RedisService } from 'src/redis/redis.service';
 import { MailService } from 'src/mail/mail.service';
-import { otpCheckDto } from 'src/products/dtos/verifyOtp.dto';
+import { otpCheckDto } from 'src/mail/dtos/verifyOtp.dto';
 import { Role } from 'src/common/enums/role.enum';
 import { PrismaService } from 'src/prisma.service';
 import { FastifyReply, FastifyRequest } from 'fastify';
@@ -44,9 +44,7 @@ export class AuthService {
     const otp = Math.floor(100000 + Math.random() * 900000);
 
     await this.redisService.set(email, otp, 300);
-    console.log('otp set on redis');
     await this.mailService.sendOtp(email, otp);
-    console.log('Mail sent');
 
     return {
       user: {
@@ -157,29 +155,32 @@ export class AuthService {
       roles: user.roles,
     });
 
-    const newRefreshToken = this.jwtService.sign({
-      sub: user.id,
-      email: user.email,
-      roles: user.roles,
-    },{
-      expiresIn:'7d'
-    });
+    const newRefreshToken = this.jwtService.sign(
+      {
+        sub: user.id,
+        email: user.email,
+        roles: user.roles,
+      },
+      {
+        expiresIn: '7d',
+      },
+    );
 
-    const hash = await bcrypt.hash(newRefreshToken,10);
+    const hash = await bcrypt.hash(newRefreshToken, 10);
 
     await this.prisma.user.update({
-      where:{id:user.id},
-      data:{refreshTokenHash:hash}
+      where: { id: user.id },
+      data: { refreshTokenHash: hash },
     });
 
-    reply.setCookie('refreshToken',newRefreshToken,{
-      httpOnly:true,
-      secure:true,
-      sameSite:"strict",
-      path:"/"
+    reply.setCookie('refreshToken', newRefreshToken, {
+      httpOnly: true,
+      secure: true,
+      sameSite: 'strict',
+      path: '/',
     });
 
-    return{accessToken:newAccessToken};
+    return { accessToken: newAccessToken };
   }
 
   async logout(userId: string, reply: FastifyReply) {

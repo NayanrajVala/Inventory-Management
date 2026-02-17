@@ -6,25 +6,32 @@ import {
   NestFastifyApplication,
 } from '@nestjs/platform-fastify';
 import { ValidationPipe } from '@nestjs/common';
-import { HttpExceptionFilter } from './common/exceptions/http_Exceptions.filter';
+import { GlobalHttpExceptionFilter } from './common/exceptions/http_Exceptions.filter';
 import {SwaggerModule,DocumentBuilder} from '@nestjs/swagger';
 import cookie from "@fastify/cookie";
-// import multipart from '@fastify/multipart';
 import '@fastify/multipart';
+import {WinstonModule} from "nest-winston"
+import { winstonLogger } from './common/logger/winston.config';
 const multipart = require('@fastify/multipart')
+
 
 
 async function bootstrap() {
   const app = await NestFactory.create<NestFastifyApplication>(
     AppModule,
     new FastifyAdapter(),
+    {
+      logger:WinstonModule.createLogger({
+        instance:winstonLogger
+      }),
+    },
   );
 
   app.enableCors({
     origin:"http://localhost:5173",
     credentials:true
   });
-  app.useGlobalFilters(new HttpExceptionFilter());
+  app.useGlobalFilters(new GlobalHttpExceptionFilter());
 
   await app.register(multipart);
 

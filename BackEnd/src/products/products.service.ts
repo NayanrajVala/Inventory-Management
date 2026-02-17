@@ -1,8 +1,16 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { Injectable,Logger} from '@nestjs/common';
 import { CreateProductDto, UpdateProductDto } from './dtos/products.dto';
 import { PrismaService } from 'src/prisma.service';
 import { Prisma, Product } from '@prisma/client';
-import { ProductNotFoundException } from '../common/exceptions/productNotFound.exception';
+import { NotFoundException } from "@nestjs/common";
+
+export class ProductNotFoundException extends NotFoundException{
+    constructor(productId?:string){
+        super(
+            productId? `Product with id ${productId} not found`:'Product Not Found'
+        );
+    }
+}
 
 export interface PaginatedProducts {
   data: Product[];
@@ -14,6 +22,8 @@ export interface PaginatedProducts {
 @Injectable()
 export class ProductsService {
   constructor(private prisma: PrismaService) {}
+
+  private readonly logger = new Logger(ProductsService.name)
   async findAll(
     page: number,
     limit: number,
@@ -51,12 +61,13 @@ export class ProductsService {
 
   async create(dto: CreateProductDto) {
     try {
+      this.logger.log('Creating Product')
       return await this.prisma.product.create({
         data: dto,
       });
     } catch (error) {
+      this.logger.error("Product creation failed");
       throw error;
-      // console.log(error, 'errorss');
     }
   }
 

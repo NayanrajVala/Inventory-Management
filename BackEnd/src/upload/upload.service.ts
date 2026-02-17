@@ -132,7 +132,6 @@ export class UploadService {
 
     for (const h of requiredHeaders) {
       if (!headers.includes(h)) {
-        console.log('First Row', records[0]);
         throw new BadRequestException(`missing column ${h}`);
       }
     }

@@ -1,7 +1,7 @@
 import { Controller, Post, Body, Redirect, Req, Res } from '@nestjs/common';
 import { AuthService } from './auth.service';
-import { signupDto } from 'src/products/dtos/signup.dto';
-import { otpCheckDto } from 'src/products/dtos/verifyOtp.dto';
+import { signupDto } from 'src/auth/dtos/signup.dto';
+import { otpCheckDto } from 'src/mail/dtos/verifyOtp.dto';
 import { ApiTags, ApiOperation, ApiCreatedResponse } from '@nestjs/swagger';
 import type { FastifyReply, FastifyRequest } from 'fastify';
 
@@ -31,8 +31,6 @@ export class AuthController {
     @Res({ passthrough: true }) reply: FastifyReply,
     @Body() dto: signupDto,
   ) {
-    console.log('Auth/login hit');
-    // console.log(await this.authService.login(dto));
     return this.authService.login(dto, reply);
   }
 

@@ -1,10 +1,11 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable,Logger } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
 import { PrismaService } from '../prisma.service';
 
 @Injectable()
 export class UserService {
   constructor(private readonly prisma: PrismaService) {}
+  private readonly logger = new Logger(UserService.name)
   async findByEmail(email: string) {
     return await this.prisma.user.findUnique({
       where: { email },
@@ -12,7 +13,6 @@ export class UserService {
   }
 
   async create(data: Prisma.UserCreateInput) {
-    console.log("Service Prisma: ",PrismaService)
     return this.prisma.user.create({ data });
   }
 
@@ -25,7 +25,7 @@ export class UserService {
         },
       });
     } catch (err: any) {
-      console.log(err);
+      Logger.error(err);
     }
   }
 }

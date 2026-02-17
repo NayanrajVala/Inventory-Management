@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { ProductsService } from './products.service';
-import { ProductNotFoundException } from '../common/exceptions/productNotFound.exception';
+import { ProductNotFoundException } from './products.service';
 
 describe('ProdcutService', () => {
   let service: ProductsService;

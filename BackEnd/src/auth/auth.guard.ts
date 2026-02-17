@@ -3,6 +3,7 @@ import {
   Injectable,
   ExecutionContext,
   UnauthorizedException,
+  Logger
 } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import { FastifyRequest } from 'fastify';
@@ -18,17 +19,16 @@ interface Request extends FastifyRequest{
 @Injectable()
 export class jwtAuthGuard implements CanActivate {
   constructor(private readonly jwtService: JwtService) {}
+  private readonly logger = new Logger(jwtAuthGuard.name)
   canActivate(context: ExecutionContext): boolean {
     const request = context.switchToHttp().getRequest<Request>();
 
     const header = request.headers.authorization;
 
-    // console.log(header);
     if (!header) {
       throw new UnauthorizedException('Authorization header missing');
     }
     const [type, token] = header.split(' ');
-    // console.log('type', type, token);
     if (!token || !(type == 'Bearer')) {
       throw new UnauthorizedException('Token is missing or expired');
     }
@@ -43,7 +43,7 @@ export class jwtAuthGuard implements CanActivate {
       };
       return true;
     } catch (err:any) {
-      console.log('Catch Hit in Auth Guard: ', err.message);
+      Logger.error('Catch Hit in Auth Guard: ', err.message);
       throw new UnauthorizedException('Invalid Token');
     }
     // return true;
