@@ -8,7 +8,7 @@ const logFormat = winston.format.printf(
 );
 
 export const winstonLogger = winston.createLogger({
-  level: 'info',
+  level: 'error',
 
   format: winston.format.combine(
     winston.format.timestamp(),
@@ -31,13 +31,6 @@ export const winstonLogger = winston.createLogger({
     new winston.transports.DailyRotateFile({
       filename: 'logs/error-%DATE%.log',
       level: 'error',
-      datePattern: 'YYYY-MM-DD',
-      maxFiles: '14d',
-    }),
-
-    // Combined logs
-    new winston.transports.DailyRotateFile({
-      filename: 'logs/combined-%DATE%.log',
       datePattern: 'YYYY-MM-DD',
       maxFiles: '14d',
     }),

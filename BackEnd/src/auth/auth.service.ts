@@ -2,6 +2,8 @@ import {
   ConflictException,
   Injectable,
   UnauthorizedException,
+  Logger,
+  BadRequestException,
 } from '@nestjs/common';
 import { JwtModule, JwtService } from '@nestjs/jwt';
 import { signupDto } from 'src/auth/dtos/signup.dto';
@@ -23,108 +25,124 @@ export class AuthService {
     private readonly mailService: MailService,
     private readonly prisma: PrismaService,
   ) {}
+  private readonly logger = new Logger(AuthService.name);
 
   async signup(dto: signupDto) {
-    const { email, password } = dto;
-    const existingUser = await this.userService.findByEmail(dto.email);
+    try {
+      const { email, password } = dto;
+      const existingUser = await this.userService.findByEmail(dto.email);
 
-    if (existingUser) {
-      throw new ConflictException('User already exist');
+      if (existingUser) {
+        throw new ConflictException('User already exist');
+      }
+
+      const hashedPassword = await bcrypt.hash(password, 10);
+
+      const user = await this.userService.create({
+        email,
+        password: hashedPassword,
+        roles: [Role.USER],
+        isVerified: false,
+      });
+
+      const otp = Math.floor(100000 + Math.random() * 900000);
+
+      await this.redisService.set(email, otp, 300);
+      await this.mailService.sendOtp(email, otp);
+
+      return {
+        user: {
+          id: user.id,
+          email: user.email,
+          roles: user.roles,
+        },
+      };
+    } catch (error) {
+      this.logger.error('Error signing up user');
+      throw new BadRequestException('Error signing up user');
     }
-
-    const hashedPassword = await bcrypt.hash(password, 10);
-
-    const user = await this.userService.create({
-      email,
-      password: hashedPassword,
-      roles: [Role.USER],
-      isVerified: false,
-    });
-
-    const otp = Math.floor(100000 + Math.random() * 900000);
-
-    await this.redisService.set(email, otp, 300);
-    await this.mailService.sendOtp(email, otp);
-
-    return {
-      user: {
-        id: user.id,
-        email: user.email,
-        roles: user.roles,
-      },
-    };
   }
 
   async verifyOtp(dto: otpCheckDto) {
-    const { otp, email } = dto;
+    try {
+      const { otp, email } = dto;
 
-    const storedOtp = await this.redisService.get(email);
+      const storedOtp = await this.redisService.get(email);
 
-    if (!storedOtp) {
-      throw new UnauthorizedException('Otp expired or not found');
+      if (!storedOtp) {
+        throw new UnauthorizedException('Otp expired or not found');
+      }
+
+      if (storedOtp !== otp) {
+        throw new UnauthorizedException('Invalid Otp');
+      }
+
+      await this.userService.verifyUser(email);
+
+      return {
+        message: 'email verified',
+      };
+    } catch (error) {
+      this.logger.log('error verifying Otp');
+      throw new BadRequestException('Error verifying Otp');
     }
-
-    if (storedOtp !== otp) {
-      throw new UnauthorizedException('Invalid Otp');
-    }
-
-    await this.userService.verifyUser(email);
-
-    return {
-      message: 'email verified',
-    };
   }
 
   async login(dto: signupDto, reply: FastifyReply) {
-    const { email, password } = dto;
-    const user = await this.userService.findByEmail(email);
+    try {
+      const { email, password } = dto;
+      const user = await this.userService.findByEmail(email);
 
-    if (!user) {
-      throw new UnauthorizedException('Invalid Credentials');
-    }
+      if (!user) {
+        throw new UnauthorizedException('Invalid Credentials');
+      }
 
-    if (!user.isVerified) {
-      throw new UnauthorizedException('You have to verify email first');
-    }
+      if (!user.isVerified) {
+        throw new UnauthorizedException('You have to verify email first');
+      }
 
-    const isPass = await bcrypt.compare(password, user.password);
+      const isPass = await bcrypt.compare(password, user.password);
 
-    if (!isPass) {
-      throw new UnauthorizedException('Invalid Credentials');
-    }
+      if (!isPass) {
+        throw new UnauthorizedException('Invalid Credentials');
+      }
 
-    const payload = {
-      sub: user.id,
-      email: user.email,
-      roles: user.roles,
-    };
-
-    const accessToken = this.jwtService.sign(payload);
-    const refreshToken = this.jwtService.sign(payload, {
-      expiresIn: '7d',
-    });
-
-    const hash = await bcrypt.hash(refreshToken, 10);
-
-    await this.prisma.user.update({
-      where: { id: user.id },
-      data: { refreshTokenHash: hash },
-    });
-
-    reply.setCookie('refreshToken', refreshToken, {
-      httpOnly: true,
-      secure: true,
-      sameSite: 'strict',
-      path: '/',
-    });
-    return {
-      accessToken,
-      user: {
-        id: user.id,
+      const payload = {
+        sub: user.id,
         email: user.email,
         roles: user.roles,
-      },
-    };
+      };
+
+      const accessToken = this.jwtService.sign(payload);
+      const refreshToken = this.jwtService.sign(payload, {
+        expiresIn: '7d',
+      });
+
+      const hash = await bcrypt.hash(refreshToken, 10);
+
+      await this.prisma.user.update({
+        where: { id: user.id },
+        data: { refreshTokenHash: hash },
+      });
+
+      reply.setCookie('refreshToken', refreshToken, {
+        httpOnly: true,
+        secure: true,
+        sameSite: 'strict',
+        path: '/',
+      });
+      return {
+        accessToken,
+        user: {
+          id: user.id,
+          email: user.email,
+          roles: user.roles,
+        },
+      };
+    } catch (error) {
+      this.logger.error('Error login in user');
+      throw new BadRequestException('Error Loging in user');
+    }
   }
 
   async refresh(req: FastifyRequest, reply: FastifyReply) {

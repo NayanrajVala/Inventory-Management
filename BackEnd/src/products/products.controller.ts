@@ -7,10 +7,8 @@ import {
   Patch,
   Query,
   Delete,
-  ParseIntPipe,
   ParseUUIDPipe,
   UseGuards,
-  Req,
 } from '@nestjs/common';
 import { ProductsService } from './products.service';
 import { CreateProductDto, UpdateProductDto } from './dtos/products.dto';
@@ -25,6 +23,7 @@ import {
   ApiOkResponse,
   ApiCreatedResponse,
 } from '@nestjs/swagger';
+import { findProductsDto } from './dtos/find_products.dto';
 
 @UseGuards(jwtAuthGuard, RolesGuard)
 @ApiTags('Products')
@@ -45,13 +44,9 @@ export class ProductsController {
   @ApiOperation({ summary: 'Get all Prodcuts' })
   @ApiOkResponse({ description: 'Fetched All Prodcuts' })
   findAll(
-    @Query('page', ParseIntPipe) page = 1,
-    @Query('limit', ParseIntPipe) limit = 5,
-    @Query('search') search='',
-    @Query('sortBy')sortBy='createdAt',
-    @Query('order')order:'asc'|'desc'='desc'
+    @Query() query:findProductsDto
   ) {
-    return this.productsService.findAll(page, limit,search,sortBy,order);
+    return this.productsService.findAll(query);
   }
 
   @Patch(':id')
@@ -60,7 +55,6 @@ export class ProductsController {
   updateProduct(
     @Param('id', ParseUUIDPipe) id: string,
     @Body() dto: UpdateProductDto,
-    @Req() req: any,
   ) {
     return this.productsService.updateProduct(id, dto);
   }

@@ -28,7 +28,7 @@ export class AuthController {
   @ApiOperation({ summary: 'Login' })
   @ApiCreatedResponse({ description: 'Login Successfull' })
   async login(
-    @Res({ passthrough: true }) reply: FastifyReply,
+    @Res({ passthrough: true }) reply: FastifyReply, 
     @Body() dto: signupDto,
   ) {
     return this.authService.login(dto, reply);
