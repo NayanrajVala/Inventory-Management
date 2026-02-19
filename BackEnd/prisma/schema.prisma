@@ -19,12 +19,13 @@ enum Role {
 }
 
 model User {
-  id         String  @id @default(uuid())
-  email      String  @unique
-  password   String
-  roles      Role[]
-  isVerified Boolean @default(false)
-  refreshTokenHash String? 
+  id                String  @id @default(uuid())
+  email             String  @unique
+  password          String
+  roles             Role[]
+  isVerified        Boolean @default(false)
+  documents         Document[]
+  refreshTokenHash  String? 
 }
 
 model Product {
@@ -46,4 +47,12 @@ model Category {
   id       Int       @id @default(autoincrement())
   name     String    @unique
   products Product[]
+}
+
+model Document{
+  id            String @id @default(uuid())
+  key           String @unique
+  uploadedBy    String
+  user          User @relation(fields:[uploadedBy], references:[id])
+  createdAt     DateTime @default(now())
 }

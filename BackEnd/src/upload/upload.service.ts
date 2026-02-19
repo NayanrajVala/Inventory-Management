@@ -76,7 +76,18 @@ export class UploadService {
     if (!key) {
       throw new BadRequestException('File key is required');
     }
+
     try {
+      const user = await this.prisma.user.findUnique({
+        where: { email },
+      });
+
+      await this.prisma.document.create({
+        data: {
+          key,
+          uploadedBy: user!.id,
+        },
+      });
       const buffer = await this.getBufferFromS3(key);
 
       const result = key.endsWith('.xlsx')
