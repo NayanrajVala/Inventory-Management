@@ -170,6 +170,8 @@ export default function Products() {
 
       <button onClick={handleLogout}>Logout</button>
 
+      <button onClick={()=>navigate('/fileUpload')}>Upload File</button>
+
       <hr />
 
       <div>

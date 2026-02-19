@@ -6,22 +6,16 @@ import {
   Logger
 } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
-import { FastifyRequest } from 'fastify';
 import 'dotenv';
+import type {FastRequest} from '../common/Types/request.types' // adds user in the request 
 
-interface Request extends FastifyRequest{
-  user?:{
-    userId:string,
-    roles:string[],
-    email:string
-  };
-}
+
 @Injectable()
 export class jwtAuthGuard implements CanActivate {
   constructor(private readonly jwtService: JwtService) {}
   private readonly logger = new Logger(jwtAuthGuard.name)
   canActivate(context: ExecutionContext): boolean {
-    const request = context.switchToHttp().getRequest<Request>();
+    const request = context.switchToHttp().getRequest<FastRequest>();
 
     const header = request.headers.authorization;
 
@@ -43,9 +37,8 @@ export class jwtAuthGuard implements CanActivate {
       };
       return true;
     } catch (err:any) {
-      Logger.error('Catch Hit in Auth Guard: ', err.message);
+      this.logger.error('Catch Hit in Auth Guard: ', err.message);
       throw new UnauthorizedException('Invalid Token');
     }
-    // return true;
   }
 }

@@ -1,4 +1,4 @@
-import { Injectable,Logger } from '@nestjs/common';
+import { BadRequestException, Injectable,Logger } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
 import { PrismaService } from '../prisma.service';
 
@@ -7,13 +7,25 @@ export class UserService {
   constructor(private readonly prisma: PrismaService) {}
   private readonly logger = new Logger(UserService.name)
   async findByEmail(email: string) {
-    return await this.prisma.user.findUnique({
+    try{
+      return await this.prisma.user.findUnique({
       where: { email },
     });
+    }
+    catch(error){
+      this.logger.error("Error Finding user");
+      throw new BadRequestException("Error in finding user");
+    }
+    
   }
 
   async create(data: Prisma.UserCreateInput) {
-    return this.prisma.user.create({ data });
+    try{
+          return this.prisma.user.create({ data });
+    } catch(error){
+      this.logger.error("Error creating user");
+      throw new BadRequestException("Error creating user");
+    }
   }
 
   async verifyUser(email: string) {
@@ -25,7 +37,8 @@ export class UserService {
         },
       });
     } catch (err: any) {
-      Logger.error(err);
+      this.logger.error(err);
+      throw new BadRequestException("Error verifying user");
     }
   }
 }

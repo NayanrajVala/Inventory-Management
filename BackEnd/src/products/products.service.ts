@@ -1,4 +1,4 @@
-import { Injectable,Logger} from '@nestjs/common';
+import { BadGatewayException, BadRequestException, Injectable,Logger} from '@nestjs/common';
 import { CreateProductDto, UpdateProductDto } from './dtos/products.dto';
 import { PrismaService } from 'src/prisma.service';
 import { Prisma} from '@prisma/client';
@@ -23,8 +23,8 @@ export class ProductsService {
   async findAll(
     findProductDto:findProductsDto
   ): Promise<PaginatedProducts> {
-
-    const page = findProductDto.page
+    try{
+       const page = findProductDto.page
     const limit = findProductDto.limit
     const search = findProductDto.search
     const sortBy= findProductDto.sortBy
@@ -56,6 +56,12 @@ export class ProductsService {
     ]);
 
     return { data, total, page, lastPage: Math.ceil(total / limit) };
+    }
+    catch(error){
+      this.logger.error("Error finding all products");
+      throw new BadRequestException("Error finding all products");
+    }
+   
   }
 
   async create(dto: CreateProductDto) {
@@ -64,13 +70,14 @@ export class ProductsService {
         data: dto,
       });
     } catch (error) {
-      this.logger.error("Product creation failed");
-      throw error;
+      this.logger.error("Product creation failed",error);
+      throw new BadRequestException("Error creating product");
     }
   }
 
   async updateProduct(id: string, dto: UpdateProductDto) {
-    const Product = await this.prisma.product.findUnique({ where: { id } });
+    try{
+      const Product = await this.prisma.product.findUnique({ where: { id } });
     if (!Product) {
       throw new ProductNotFoundException();
     }
@@ -78,11 +85,23 @@ export class ProductsService {
       where: { id },
       data: dto,
     });
+    }
+    catch(error){
+      this.logger.error("Error updating product");
+      throw new BadRequestException("Error updating product");
+    }
   }
 
   async deleteProduct(id: string) {
-    return this.prisma.product.delete({
+    try{
+      return this.prisma.product.delete({
       where: { id },
     });
+    }
+    catch(error){
+      this.logger.error("Error deleting product");
+      throw new BadRequestException("Error deleting Product");
+    }
+    
   }
 }

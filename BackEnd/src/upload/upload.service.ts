@@ -10,10 +10,14 @@ import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
 import { Readable } from 'stream';
 import * as XLSX from 'xlsx';
 import { allowedTypesConst } from './upload.const';
+import { MailService } from 'src/mail/mail.service';
 
 @Injectable()
 export class UploadService {
-  constructor(private prisma: PrismaService) {}
+  constructor(
+    private prisma: PrismaService,
+    private mailService: MailService,
+  ) {}
   private readonly logger = new Logger(UploadService.name);
   private s3 = new S3Client({
     region: process.env.AWS_REGION,
@@ -23,14 +27,32 @@ export class UploadService {
     },
   });
 
-  async getUploadUrl(filename: string, mimetype: string) {
+  async getBufferFromS3(key: string) {
+    if (!key) {
+      throw new BadRequestException('Please provide valid key');
+    }
+    const command = new GetObjectCommand({
+      Bucket: process.env.AWS_BUCKET!,
+      Key: key,
+    });
+
     try {
-      let allowedTypes = allowedTypesConst;
+      const response = await this.s3.send(command);
 
-      if (!allowedTypes.includes(mimetype)) {
-        throw new BadRequestException('Only excel or CSV files are accepted');
-      }
+      return await this.streamToBuffer(response.Body as Readable);
+    } catch (error) {
+      this.logger.error('Error Getting file from cloud');
+      throw new BadRequestException('Error Getting file from cloud');
+    }
+  }
 
+  async getUploadUrl(filename: string, mimetype: string) {
+    let allowedTypes = allowedTypesConst;
+
+    if (!allowedTypes.includes(mimetype)) {
+      throw new BadRequestException('Only excel or CSV files are accepted');
+    }
+    try {
       const key = `import/${Date.now()}-${filename}`;
 
       const command = new PutObjectCommand({
@@ -45,45 +67,40 @@ export class UploadService {
 
       return { uploadUrl, key };
     } catch (error) {
-      this.logger.error('PreSignedUrl Error');
+      this.logger.error('PreSignedUrl Error', error);
       throw new BadRequestException('Unable to generate upload url');
     }
   }
 
-  async uploadFile(key: string) {
+  async uploadFile(key: string, email: string) {
+    if (!key) {
+      throw new BadRequestException('File key is required');
+    }
     try {
-      if (!key) {
-        throw new BadRequestException('File key is required');
-      }
+      const buffer = await this.getBufferFromS3(key);
 
-      const command = new GetObjectCommand({
-        Bucket: process.env.AWS_BUCKET!,
-        Key: key,
-      });
+      const result = key.endsWith('.xlsx')
+        ? await this.parseExcel(buffer)
+        : await this.parseCsv(buffer);
 
-      const response = await this.s3.send(command);
+      const rawfilename = key.split('/').pop()!;
+      const filename = rawfilename.substring(rawfilename.indexOf('-') + 1);
 
-      const streamToBuffer = async (stream: Readable) => {
-        const chunks: Uint8Array[] = [];
+      await this.mailService.sendAttachment(email, buffer, filename!);
 
-        for await (const chunk of stream) {
-          chunks.push(chunk);
-        }
-
-        return Buffer.concat(chunks);
-      };
-
-      const buffer = await streamToBuffer(response.Body as Readable);
-
-      if (key.endsWith('.xlsx')) {
-        return this.parseExcel(buffer);
-      }
-
-      return this.parseCsv(buffer);
+      return result;
     } catch (error) {
       this.logger.error('File Uploading Error', error);
       throw new BadRequestException('Failed to process uploaded file');
     }
+  }
+
+  async streamToBuffer(stream: Readable) {
+    const chunks: Uint8Array[] = [];
+    for await (const chunk of stream) {
+      chunks.push(chunk);
+    }
+    return Buffer.concat(chunks);
   }
 
   async parseExcel(buffer: Buffer) {
@@ -161,55 +178,54 @@ export class UploadService {
   }
 
   private async processRecords(records: any[]) {
-    try{
+    try {
       const categories = await this.prisma.category.findMany();
-    const categoryMap = new Map(
-      categories.map((c) => [c.name.toLowerCase(), c.id]),
-    );
+      const categoryMap = new Map(
+        categories.map((c) => [c.name.toLowerCase(), c.id]),
+      );
 
-    const errors: string[] = [];
-    const products: any[] = [];
+      const errors: string[] = [];
+      const products: any[] = [];
 
-    for (let i = 0; i < records.length; i++) {
-      const row = records[i];
+      for (let i = 0; i < records.length; i++) {
+        const row = records[i];
 
-      const name = row.name?.toString().trim();
-      const price = Number(row.price);
-      const quantity = Number(row.quantity);
-      const categoryName = row.category?.toString().trim().toLowerCase();
+        const name = row.name?.toString().trim();
+        const price = Number(row.price);
+        const quantity = Number(row.quantity);
+        const categoryName = row.category?.toString().trim().toLowerCase();
 
-      if (!name) errors.push(`Row ${i + 1}: name missing`);
-      if (isNaN(price)) errors.push(`Row ${i + 1}: invalid price`);
-      if (isNaN(quantity)) errors.push(`Row ${i + 1}: invalid quantity`);
+        if (!name) errors.push(`Row ${i + 1}: name missing`);
+        if (isNaN(price)) errors.push(`Row ${i + 1}: invalid price`);
+        if (isNaN(quantity)) errors.push(`Row ${i + 1}: invalid quantity`);
 
-      const categoryId = categoryMap.get(categoryName);
+        const categoryId = categoryMap.get(categoryName);
 
-      if (!categoryId) {
-        errors.push(`Row ${i + 1}: ${row.category} not valid`);
+        if (!categoryId) {
+          errors.push(`Row ${i + 1}: ${row.category} not valid`);
+        }
+
+        products.push({ name, price, quantity, categoryId });
       }
 
-      products.push({ name, price, quantity, categoryId });
-    }
+      if (errors.length) {
+        throw new BadRequestException(errors);
+      }
 
-    if (errors.length) {
-      throw new BadRequestException(errors);
-    }
-
-    await this.prisma.$transaction(async (tx) => {
-      await tx.product.createMany({
-        data: products,
-        skipDuplicates: true,
+      await this.prisma.$transaction(async (tx) => {
+        await tx.product.createMany({
+          data: products,
+          skipDuplicates: true,
+        });
       });
-    });
 
-    return {
-      message: 'Products imported successfully',
-      count: products.length,
-    };
-    }
-    catch(error){
-      this.logger.error("Error processing Records");
-      throw new BadRequestException("Error Processing Records");
+      return {
+        message: 'Products imported successfully',
+        count: products.length,
+      };
+    } catch (error) {
+      this.logger.error('Error processing Records');
+      throw new BadRequestException('Error Processing Records');
     }
   }
 }

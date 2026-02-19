@@ -1,4 +1,4 @@
-import { Injectable,Logger } from '@nestjs/common';
+import { BadRequestException, Injectable,Logger } from '@nestjs/common';
 import Redis from 'ioredis';
 
 @Injectable()
@@ -11,33 +11,56 @@ export class RedisService {
         host:"127.0.0.1",
         port:6379.
     });
-
-    this.client.on('connect',()=>{
-        Logger.log("Redis Connected successfully");
+    try{
+        this.client.on('connect',()=>{
+        console.log("Redis Connected successfully");
     });
+    }
+    catch(error){
+        this.logger.error("Error Connecting Redis");
+    }
     }
 
     async set(key: string , otp:number , expTime:number){
-        const value = otp.toString();
+        try{
+            const value = otp.toString();
 
         if(expTime){
             return this.client.set(key,value,'EX',expTime);
         }
 
         return this.client.set(key,value);
+        }
+        catch(error){
+            this.logger.error("Error setting otp on redis");
+            throw new BadRequestException("Error setting otp on redis");
+        }
+        
     }
 
     async get(key:string):Promise<string |null>{
-
-        const value = await this.client.get(key);
+        try{
+            const value = await this.client.get(key);
 
         if(!value){
             return null;
         }
         return value;
+        }
+        catch(error){
+            this.logger.error("Error getting otp from redis");
+            throw new BadRequestException("Error getting otp from redis");
+        }   
     }
 
     async delete(key:string){
-        return this.client.del(key);
+        try{
+            return this.client.del(key);
+        }
+        catch(error){
+            this.logger.error("Error deleting from redis");
+            throw new BadRequestException("Error deleting from redis");
+        }
+        
     }
 }

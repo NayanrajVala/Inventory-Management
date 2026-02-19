@@ -146,7 +146,8 @@ export class AuthService {
   }
 
   async refresh(req: FastifyRequest, reply: FastifyReply) {
-    const token = req.cookies.refreshToken;
+    try{
+      const token = req.cookies.refreshToken;
 
     if (!token) {
       throw new UnauthorizedException();
@@ -199,10 +200,16 @@ export class AuthService {
     });
 
     return { accessToken: newAccessToken };
+    }
+    catch(error){
+      this.logger.error("Error in RefreshToken method");
+      throw new BadRequestException("Error in RefreshToken method");
+    }
   }
 
   async logout(userId: string, reply: FastifyReply) {
-    await this.prisma.user.update({
+    try{
+      await this.prisma.user.update({
       where: { id: userId },
       data: { refreshTokenHash: null },
     });
@@ -212,5 +219,10 @@ export class AuthService {
     });
 
     return { message: 'Logged out successfully' };
+    }
+    catch(error){
+      this.logger.error("Error Logging out user");
+      throw new BadRequestException("Error Logging out user");
+    }
   }
 }

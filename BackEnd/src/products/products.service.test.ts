@@ -1,6 +1,7 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { ProductsService } from './products.service';
 import { ProductNotFoundException } from './products.service';
+import { findProductsDto } from './dtos/find_products.dto';
 
 describe('ProdcutService', () => {
   let service: ProductsService;
@@ -26,7 +27,15 @@ describe('ProdcutService', () => {
       mockPrisma.product.findMany.mockResolvedValue(fakeProducts);
       mockPrisma.product.count.mockResolvedValue(2);
 
-      const result = await service.findAll(1, 5, '', 'name', 'asc');
+      const query: findProductsDto = {
+      page: 1,
+      limit: 5,
+      search: '',
+      sortBy: 'name',
+      order: 'asc',
+    };
+
+      const result = await service.findAll(query);
 
       expect(result).toEqual({
         data: fakeProducts,
@@ -39,8 +48,15 @@ describe('ProdcutService', () => {
     it('calculates skip correctly for pagination', async () => {
       mockPrisma.product.findMany.mockResolvedValue([]);
       mockPrisma.product.count.mockResolvedValue(0);
+      const query: findProductsDto = {
+      page: 2,
+      limit: 5,
+      search: '',
+      sortBy: 'name',
+      order: 'asc',
+    };
 
-      await service.findAll(2, 5, '', 'name', 'asc');
+      await service.findAll(query);
 
       expect(mockPrisma.product.findMany).toHaveBeenCalledWith(
         expect.objectContaining({
@@ -54,7 +70,14 @@ describe('ProdcutService', () => {
       mockPrisma.product.findMany.mockResolvedValue([]);
       mockPrisma.product.count.mockResolvedValue(0);
 
-      await service.findAll(1, 5, 'cycle', 'createdAt', 'asc');
+      const query: findProductsDto = {
+      page: 1,
+      limit: 5,
+      search: 'cycle',
+      sortBy: 'createdAt',
+      order: 'asc',
+    };
+      await service.findAll(query);
 
       expect(mockPrisma.product.findMany).toHaveBeenCalledWith(
         expect.objectContaining({
@@ -71,8 +94,15 @@ describe('ProdcutService', () => {
     it('does not apply search filter when search is empty', async () => {
       mockPrisma.product.findMany.mockResolvedValue([]);
       mockPrisma.product.count.mockResolvedValue();
+      const query: findProductsDto = {
+      page: 1,
+      limit: 5,
+      search: '',
+      sortBy: 'name',
+      order: 'asc',
+    };
 
-      await service.findAll(1, 5, '', 'name', 'asc');
+      await service.findAll(query);
 
       expect(mockPrisma.product.findMany).toHaveBeenCalledWith(
         expect.objectContaining({
@@ -84,8 +114,15 @@ describe('ProdcutService', () => {
     it('applies sorting correctly', async () => {
       mockPrisma.product.findMany.mockResolvedValue([]);
       mockPrisma.product.count.mockResolvedValue(0);
+      const query: findProductsDto = {
+      page: 1,
+      limit: 5,
+      search: '',
+      sortBy: 'name',
+      order: 'asc',
+    };
 
-      await service.findAll(1, 5, '', 'name', 'desc');
+      await service.findAll(query);
 
       expect(mockPrisma.product.findMany).toHaveBeenCalledWith(
         expect.objectContaining({
@@ -97,8 +134,15 @@ describe('ProdcutService', () => {
     it('should calculate last Page correctly', async () => {
       mockPrisma.product.findMany.mockResolvedValue({ id: 1 });
       mockPrisma.product.count.mockResolvedValue(25);
+      const query: findProductsDto = {
+      page: 1,
+      limit: 5,
+      search: '',
+      sortBy: 'id',
+      order: 'asc',
+    };
 
-      const result = await service.findAll(1, 5, '', 'id', 'asc');
+      const result = await service.findAll(query);
 
       expect(result.lastPage).toBe(5);
     });
