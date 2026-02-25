@@ -24,8 +24,9 @@ import {
   ApiCreatedResponse,
 } from '@nestjs/swagger';
 import { findProductsDto } from './dtos/find_products.dto';
+import { CognitoAuthGuard } from 'src/auth/cognito.guard';
 
-@UseGuards(jwtAuthGuard, RolesGuard)
+@UseGuards(CognitoAuthGuard, RolesGuard)
 @ApiTags('Products')
 @ApiBearerAuth()
 @Controller('products')

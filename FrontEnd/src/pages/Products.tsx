@@ -93,6 +93,7 @@ export default function Products() {
   };
 
   const handleLogout = () => {
+    localStorage.removeItem("email");
     localStorage.removeItem("token");
     localStorage.removeItem("user");
     navigate("/login");
@@ -170,7 +171,7 @@ export default function Products() {
 
       <button onClick={handleLogout}>Logout</button>
 
-      <button onClick={()=>navigate('/fileUpload')}>Upload File</button>
+      <button onClick={() => navigate("/fileUpload")}>Upload File</button>
 
       <hr />
 
