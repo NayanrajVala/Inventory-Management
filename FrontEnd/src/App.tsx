@@ -20,7 +20,6 @@ function App() {
       <Route path="*" element={<Navigate to="/login" replace />} />
     </Routes>
   );
-  // return <h1>Hello</h1>;
 }
 
 export default App;

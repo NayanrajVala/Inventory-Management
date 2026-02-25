@@ -16,7 +16,6 @@ export class UserService {
       this.logger.error("Error Finding user");
       throw new BadRequestException("Error in finding user");
     }
-    
   }
 
   async create(data: Prisma.UserCreateInput) {

@@ -11,6 +11,7 @@ import { Readable } from 'stream';
 import * as XLSX from 'xlsx';
 import { allowedTypesConst } from './upload.const';
 import { MailService } from 'src/mail/mail.service';
+import { error } from 'winston';
 
 @Injectable()
 export class UploadService {
@@ -82,6 +83,10 @@ export class UploadService {
         where: { email },
       });
 
+      if (!user) {
+        throw new BadRequestException('User Not Found');
+      }
+
       await this.prisma.document.create({
         data: {
           key,
@@ -90,7 +95,9 @@ export class UploadService {
       });
       const buffer = await this.getBufferFromS3(key);
 
-      const result = key.endsWith('.xlsx')
+      const lowerKey = key.toLowerCase();
+
+      const result = lowerKey.endsWith('.xlsx')
         ? await this.parseExcel(buffer)
         : await this.parseCsv(buffer);
 
@@ -102,6 +109,8 @@ export class UploadService {
       return result;
     } catch (error) {
       this.logger.error('File Uploading Error', error);
+
+      if (error instanceof BadRequestException) throw error;
       throw new BadRequestException('Failed to process uploaded file');
     }
   }
@@ -117,43 +126,91 @@ export class UploadService {
   async parseExcel(buffer: Buffer) {
     try {
       const workbook = XLSX.read(buffer, { type: 'buffer' });
-
-      const sheetName = workbook.SheetNames[0];
-      const sheet = workbook.Sheets[sheetName];
-
-      const rawRecords = XLSX.utils.sheet_to_json(sheet, {
-        defval: '',
-      }) as Record<string, string>[];
-
-      if (!rawRecords.length) {
-        throw new BadRequestException('Excel file is empty');
-      }
-
-      const records = rawRecords.map((row) => {
-        const normalized: Record<string, any> = {};
-
-        for (const key in row) {
-          normalized[key.trim().toLowerCase()] = row[key];
-        }
-
-        return normalized;
-      });
-      const headers = Object.keys(records[0]).map((h) =>
-        h.trim().toLowerCase(),
-      );
-
       const requiredHeaders = ['name', 'price', 'quantity', 'category'];
 
-      for (const h of requiredHeaders) {
-        if (!headers.includes(h)) {
-          throw new BadRequestException(`Missing Column ${h}`);
+      const allRecords: Record<string, any>[] = [];
+      const errors: string[] = [];
+
+      for (const sheetName of workbook.SheetNames) {
+        const sheetErrors: string[] = [];
+
+        const sheet = workbook.Sheets[sheetName];
+        const rawRecords = XLSX.utils.sheet_to_json(sheet, {
+          defval: '',
+        }) as Record<string, string>[];
+
+        if (!rawRecords.length) continue;
+
+        const records = rawRecords.map((row) => {
+          const normalized: Record<string, any> = {};
+          for (const key in row) {
+            normalized[key.trim().toLowerCase()] = row[key];
+          }
+          return normalized;
+        });
+
+        const headers = Object.keys(records[0]);
+
+        //  header validation
+        for (const required of requiredHeaders) {
+          if (!headers.includes(required)) {
+            sheetErrors.push(
+              `Sheet "${sheetName}": missing column "${required}"`,
+            );
+          }
+        }
+
+        // if header errors → record & skip rows of this sheet
+        if (sheetErrors.length) {
+          errors.push(...sheetErrors);
+          continue;
+        }
+
+        // attach metadata
+        records.forEach((row, index) => {
+          allRecords.push({
+            ...row,
+            __sheet: sheetName,
+            __row: index + 2,
+          });
+        });
+      }
+
+      // ✅ process rows EVEN IF some sheets had header errors
+      let rowErrors: string[] = [];
+
+      if (allRecords.length) {
+        try {
+          await this.processRecords(allRecords);
+        } catch (err) {
+          if (err instanceof BadRequestException) {
+            const msg = err.getResponse() as any;
+            if (Array.isArray(msg.message)) {
+              rowErrors = msg.message;
+            }
+          } else {
+            throw err;
+          }
         }
       }
 
-      return this.processRecords(records);
+      const combinedErrors = [...errors, ...rowErrors];
+
+      if (combinedErrors.length) {
+        throw new BadRequestException(combinedErrors);
+      }
+
+      return {
+        message: 'Products imported successfully',
+        count: allRecords.length,
+      };
     } catch (error) {
-      this.logger.error('Error Parsing Excel');
-      throw new BadRequestException('Error in parsing excel');
+      this.logger.error('Error parsing Excel', error);
+
+      if (error instanceof BadRequestException) throw error;
+      if (error instanceof Error) throw new BadRequestException(error.message);
+
+      throw new BadRequestException('Unexpected Excel parsing error');
     }
   }
   async parseCsv(buffer: Buffer) {
@@ -183,8 +240,10 @@ export class UploadService {
 
       return this.processRecords(records);
     } catch (error) {
-      this.logger.error('Error parsing CSV');
-      throw new BadRequestException('Error Parsing CSV');
+      this.logger.error('Error parsing CSV', error);
+      if (error instanceof Error) throw new BadRequestException(error.message);
+
+      throw new BadRequestException('Unexpected error Occured');
     }
   }
 
@@ -206,14 +265,21 @@ export class UploadService {
         const quantity = Number(row.quantity);
         const categoryName = row.category?.toString().trim().toLowerCase();
 
-        if (!name) errors.push(`Row ${i + 1}: name missing`);
-        if (isNaN(price)) errors.push(`Row ${i + 1}: invalid price`);
-        if (isNaN(quantity)) errors.push(`Row ${i + 1}: invalid quantity`);
+        const sheet = row.__sheet ?? 'unknown';
+        const rowNumber = row.__row ?? i + 1;
+
+        if (!name) errors.push(`Sheet ${sheet} Row ${rowNumber} :name missing`);
+        if (isNaN(price))
+          errors.push(`Sheet ${sheet} Row ${rowNumber} :invalid price`);
+        if (isNaN(quantity))
+          errors.push(`Sheet ${sheet} Row ${rowNumber} : invalid quantity`);
 
         const categoryId = categoryMap.get(categoryName);
 
         if (!categoryId) {
-          errors.push(`Row ${i + 1}: ${row.category} not valid`);
+          errors.push(
+            `Sheet ${sheet} Row ${rowNumber}: "${row.category}" category not found`,
+          );
         }
 
         products.push({ name, price, quantity, categoryId });
@@ -235,7 +301,10 @@ export class UploadService {
         count: products.length,
       };
     } catch (error) {
-      this.logger.error('Error processing Records');
+      this.logger.error('Error processing Records', error);
+      if (error instanceof BadRequestException) {
+        throw error;
+      }
       throw new BadRequestException('Error Processing Records');
     }
   }

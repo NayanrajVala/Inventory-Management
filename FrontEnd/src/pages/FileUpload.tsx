@@ -36,9 +36,15 @@ export default function FileUpload() {
       await api.post("/upload/import", { key });
 
       alert("File uploaded successfully!");
-    } catch (error) {
+    } catch (error: any) {
       console.error(error);
-      alert("Upload failed provide valid file csv or.xlsx");
+      if (error.response?.data?.message) {
+        alert(error.response.data.message);
+      } else if (error.message) {
+        alert(error.message);
+      } else {
+        alert("Upload Failed , Please try again");
+      }
     } finally {
       setLoading(false);
     }
